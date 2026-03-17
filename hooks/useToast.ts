@@ -15,9 +15,9 @@ class ToastStore {
   private toasts: Toast[] = []
   private listeners: Set<ToastListener> = new Set()
 
-  subscribe(listener: ToastListener) {
+  subscribe(listener: ToastListener): () => void {
     this.listeners.add(listener)
-    return () => this.listeners.delete(listener)
+    return () => { this.listeners.delete(listener) }
   }
 
   getToasts() {
@@ -50,6 +50,8 @@ export function useToast() {
 
 export function useToastState(): Toast[] {
   const [toasts, setToasts] = useState<Toast[]>([])
-  useEffect(() => store.subscribe(setToasts), [])
+  useEffect(() => {
+    return store.subscribe(setToasts)
+  }, [])
   return toasts
 }
