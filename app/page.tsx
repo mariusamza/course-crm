@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 // app/page.tsx
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'

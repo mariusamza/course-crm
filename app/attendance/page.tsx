@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 // app/attendance/page.tsx
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
