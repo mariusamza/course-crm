@@ -1,0 +1,280 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  TEACHER
+  STUDENT
+}
+
+enum EnrollmentStatus {
+  INTERESTED
+  FOLLOWING
+  FINISHED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LEAVE
+  LATE
+}
+
+enum PaymentStatus {
+  PENDING
+  PARTIAL
+  PAID
+  OVERDUE
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  TRANSFER
+  OTHER
+}
+
+enum CourseStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  username      String    @unique
+  email         String?   @unique
+  password      String
+  role          Role      @default(STUDENT)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  student       Student?
+  trainer       Trainer?
+  attendanceMarked Attendance[] @relation("MarkedBy")
+  notes         StudentNote[]
+
+  @@map("users")
+}
+
+model Student {
+  id            String    @id @default(cuid())
+  studentId     String    @unique // e.g. STU001
+  firstName     String
+  lastName      String
+  cnp           String?   @unique // Romanian personal ID
+  phone         String?
+  address       String?
+  ciSeries      String?   // Identity card series
+  ciNumber      String?   // Identity card number
+
+  // Guardian info
+  guardianName  String?
+  guardianPhone String?
+  guardianEmail String?
+
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  enrollments   Enrollment[]
+  documents     StudentDocument[]
+  notes         StudentNote[]
+  attendance    Attendance[]
+  finance       Finance[]
+
+  @@map("students")
+}
+
+model StudentDocument {
+  id          String    @id @default(cuid())
+  name        String
+  type        String    // 'ci' | 'diploma' | 'other'
+  fileData    String    @db.Text // base64
+  mimeType    String
+  size        Int
+  studentId   String
+  student     Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@map("student_documents")
+}
+
+model StudentNote {
+  id          String    @id @default(cuid())
+  content     String    @db.Text
+  studentId   String
+  student     Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  authorId    String
+  author      User      @relation(fields: [authorId], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("student_notes")
+}
+
+model Trainer {
+  id          String    @id @default(cuid())
+  trainerId   String    @unique // e.g. TRN001
+  firstName   String
+  lastName    String
+  phone       String?
+  email       String?
+  bio         String?   @db.Text
+
+  userId      String    @unique
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  courses     Course[]
+
+  @@map("trainers")
+}
+
+model Course {
+  id          String      @id @default(cuid())
+  courseId    String      @unique // e.g. CRS001
+  name        String
+  description String?     @db.Text
+  startDate   DateTime
+  endDate     DateTime
+  status      CourseStatus @default(UPCOMING)
+
+  // Schedule
+  timeSlots   Json        // Array of {day, startTime, endTime}
+  weekDays    Json        // Array of day names
+
+  trainerId   String?
+  trainer     Trainer?    @relation(fields: [trainerId], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  enrollments Enrollment[]
+  sessions    CourseSession[]
+  finance     Finance[]
+
+  @@map("courses")
+}
+
+model Enrollment {
+  id              String          @id @default(cuid())
+  status          EnrollmentStatus @default(INTERESTED)
+  enrollmentDate  DateTime        @default(now())
+  completionDate  DateTime?
+  notes           String?         @db.Text
+
+  studentId       String
+  student         Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  courseId        String
+  course          Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@unique([studentId, courseId])
+  @@map("enrollments")
+}
+
+model CourseSession {
+  id          String    @id @default(cuid())
+  sessionDate DateTime
+  startTime   String
+  endTime     String
+  topic       String?
+  notes       String?   @db.Text
+
+  courseId    String
+  course      Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  attendance  Attendance[]
+
+  @@map("course_sessions")
+}
+
+model Attendance {
+  id          String          @id @default(cuid())
+  status      AttendanceStatus @default(PRESENT)
+  notes       String?
+
+  sessionId   String
+  session     CourseSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  studentId   String
+  student     Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  markedById  String
+  markedBy    User            @relation("MarkedBy", fields: [markedById], references: [id])
+
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@unique([sessionId, studentId])
+  @@map("attendance")
+}
+
+model Finance {
+  id            String        @id @default(cuid())
+  totalAmount   Float
+  paidAmount    Float         @default(0)
+  status        PaymentStatus @default(PENDING)
+  advanceAmount Float         @default(0)
+  notes         String?       @db.Text
+
+  studentId     String
+  student       Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  courseId      String
+  course        Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relations
+  installments  PaymentInstallment[]
+
+  @@unique([studentId, courseId])
+  @@map("finance")
+}
+
+model PaymentInstallment {
+  id            String        @id @default(cuid())
+  amount        Float
+  dueDate       DateTime
+  paidDate      DateTime?
+  method        PaymentMethod @default(CASH)
+  status        PaymentStatus @default(PENDING)
+  notes         String?
+
+  financeId     String
+  finance       Finance       @relation(fields: [financeId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@map("payment_installments")
+}
+
+model Setting {
+  id        String  @id @default(cuid())
+  key       String  @unique
+  value     String  @db.Text
+
+  @@map("settings")
+}
