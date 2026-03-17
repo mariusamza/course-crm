@@ -13,6 +13,7 @@
     "db:seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
   },
   "dependencies": {
+	"next-themes": "^0.3.0",
     "@auth/prisma-adapter": "^2.4.1",
     "@prisma/client": "^5.16.1",
     "@radix-ui/react-avatar": "^1.1.0",
