@@ -1,38 +1,55 @@
 'use client'
 // hooks/useToast.ts
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 
-interface Toast {
+export interface Toast {
   id: string
   title: string
   description?: string
   variant?: 'default' | 'destructive'
 }
 
-// Simple global toast state
-let toastListeners: ((toasts: Toast[]) => void)[] = []
-let toasts: Toast[] = []
+type ToastListener = (toasts: Toast[]) => void
 
-function notify() {
-  toastListeners.forEach(l => l([...toasts]))
+class ToastStore {
+  private toasts: Toast[] = []
+  private listeners: Set<ToastListener> = new Set()
+
+  subscribe(listener: ToastListener) {
+    this.listeners.add(listener)
+    return () => this.listeners.delete(listener)
+  }
+
+  getToasts() {
+    return this.toasts
+  }
+
+  add(toast: Omit<Toast, 'id'>) {
+    const id = Math.random().toString(36).slice(2)
+    this.toasts = [...this.toasts, { ...toast, id }]
+    this.notify()
+    setTimeout(() => this.remove(id), 3500)
+  }
+
+  private remove(id: string) {
+    this.toasts = this.toasts.filter(t => t.id !== id)
+    this.notify()
+  }
+
+  private notify() {
+    this.listeners.forEach(l => l([...this.toasts]))
+  }
 }
 
-export function useToast() {
-  const toast = useCallback(({ title, description, variant = 'default' }: Omit<Toast, 'id'>) => {
-    const id = Math.random().toString(36).slice(2)
-    toasts = [...toasts, { id, title, description, variant }]
-    notify()
-    setTimeout(() => {
-      toasts = toasts.filter(t => t.id !== id)
-      notify()
-    }, 3500)
-  }, [])
+const store = new ToastStore()
 
+export function useToast() {
+  const toast = useCallback((t: Omit<Toast, 'id'>) => store.add(t), [])
   return { toast }
 }
 
-export function useToastState() {
-  const [state, setState] = useState<Toast[]>([])
-  toastListeners = [setState]
-  return state
+export function useToastState(): Toast[] {
+  const [toasts, setToasts] = useState<Toast[]>([])
+  useEffect(() => store.subscribe(setToasts), [])
+  return toasts
 }

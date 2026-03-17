@@ -86,7 +86,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               className={cn('sidebar-link', pathname.startsWith(item.href) && 'active')}
               onClick={() => setSidebarOpen(false)}
             >
-              <item.icon className="w-4.5 h-4.5 flex-shrink-0" size={18} />
+              <item.icon className="w-5 h-5 flex-shrink-0" size={18} />
               <span>{item.label}</span>
             </Link>
           ))}
